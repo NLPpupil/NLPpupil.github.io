@@ -22,7 +22,7 @@ $$
 e^{(t)} = [x^{(t-w)}L,...,x^{(t)}L,...,x^{(t+w)}L] \\
 h^{(t)} = ReLU(e^{(t)}W+b_1) \\
 \hat y^{(t)} = softmax(h^{(t)}U+b_2)\\
-J = CrossEntropy(y^{(t)},\hat y^{(t)} \\
+J = CrossEntropy(y^{(t)},\hat y^{(t)}) \\
 CrossEntropy(y^{(t)},\hat y^{(t)}) = - \sum_i{}{}y_i^{(t)} log(\hat y_i^{(t)})
 \end{equation}
 $$
@@ -33,3 +33,22 @@ $$
 - 在`make_windowed_data`函数里把一个批量的输入序列转换成一个批量的窗口化（输入-输出）对。用`python q1_window.py test1`测试。
 - 在`WindowModel`类里实现相应的函数来实现之前描述的前馈神经网络。用`python q1_window.py test2`测试。
 - 用`python q1 window.py train`训练，大概运行2-3分钟，得到至少81%的$F1$。结果储存在`results/window/<timestamp>/`，可以用`python q1 window.py shell -m results/window/<timestamp>/`互动。
+
+#### 2 循环神经网络NER
+循环神经网络的介绍见[循环神经网络综述](https://nlppupil.github.io/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0/2017/10/04/%E5%BE%AA%E7%8E%AF%E7%A5%9E%E7%BB%8F%E7%BD%91%E7%BB%9C%E7%BB%BC%E8%BF%B0.html)。RNN NER的数学表示如下：
+
+$$
+\begin{equation}
+e^{(t)} = x^{(t)}L \\
+h^{(t)} = \sigma (h^{(t-1)}W_h + e^{(t)}W_x + b_1) \\
+\hat y^{(t)} = softmax(h^{(t)}U+b_2) \\
+J = \sum_{t=1}^TCE(y^{(t)},\hat y^{(t)})
+\end{equation}
+$$
+
+这里$W_h \in \mathbb{R}^{H\times H}$，$W_x \in \mathbb{R}^{D\times H}$，$b_1 \in \mathbb{R}^{H}$ 是RNN的参数，$U \in \mathbb{R}^{H\times C}$，$b_2  \in \mathbb{R}^{C}$ 是softmax层的参数。
+
+**问题**：
+- 实现`rnn_cell`函数，用`python q2 rnn cell.py test`测试。
+- 实现RNN要展开RNN单元，但是每个句子的长度都不一样，批量处理数据是不可能的。<br>最常用的解决办法是填充（pad）。假设最长的句子长度是$M$，对于一个长度为$T$的输入我们要：<br>1.在$x$和$y$后面填充$0$向量让它们长度变成$M$。<br>2.创建一个长度为$M$的遮掩(masking)向量$m$，向量中的元素是$1$如果$t \leq T$，否则是$0$。 <br> 3.损失函数变成：$J = \sum_{t=1}^Mm^{(t)}CE(y^{(t)},\hat y^{(t)})$ <br> 实现`pad_sequences`，用`python q2 rnn.py test1`测试。
+- 实现RNN模型的剩余部分，包括：<br>
