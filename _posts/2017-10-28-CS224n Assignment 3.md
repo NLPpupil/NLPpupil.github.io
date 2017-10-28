@@ -57,4 +57,13 @@ $$
 #### 3 欣赏GRU
 GRU的介绍见[循环神经网络综述](https://nlppupil.github.io/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0/2017/10/04/%E5%BE%AA%E7%8E%AF%E7%A5%9E%E7%BB%8F%E7%BD%91%E7%BB%9C%E7%BB%BC%E8%BF%B0.html)。
 
-**闭锁行为建模(Modeling latching behavior)** 输入序列从$0$或$1$开始，后面跟着$n$个$0$，比如 $0,1,00,10,000,1000$。我们想要状态$h$持续记住第一个数字，无论后面跟了多少个$0$。可用下图描述（这是一个自动状态机）：![automation](https://nlppupil.github.io/images/BP.jpeg)
+**闭锁行为建模(Modeling latching behavior)** 输入序列从$0$或$1$开始，后面跟着$n$个$0$，比如 $0,1,00,10,000,1000$。我们想要状态$h$持续记住第一个数字，无论后面跟了多少个$0$。可用下图描述（这是一个自动状态机）：
+
+![automation](https://nlppupil.github.io/images/automation.png)
+
+**问题**：
+- 实现GRU单元。用`python q3_gru_cell.py test`测试。
+- 在`q3_gru.py`中，用`tf.nn.dynamic rnn`实现`add_prediction_op`。
+- 在`add_training_op`中，计算梯度，裁剪梯度。
+- 运行`python q3_gru.py predict -c [rnn|gru] [-g]`，`-g`表示使用梯度裁剪。
+- 用`python q2_rnn.py train -c gru`训练GRU版的NER。
