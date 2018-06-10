@@ -7,13 +7,71 @@ categories: 自然语言处理 深度学习
 
 ### 基础要求
 
-- 掌握基本的encoder-decoder + attention结构。
-- 
-- 
+- 传统NMT encoder-decoder + attention结构。
+- 概率基础。
+- 矩阵乘法。
+- Residual Connection
+- Layer Normalization
+
+
 
 ### Attention 定义
-你所需要的只是注意力，那么注意力是什么呢？原文有一段话，要深刻理解：
+你所需要的只是注意力，那么注意力是什么呢？原文有一段精辟的定义，要深刻理解：
 >An attention function can be described as mapping a query and a set of key-value pairs to an output, where the query, keys, values, and output are all vectors. The output is computed as a weighted sum of the values, where the weight assigned to each value is computed by a compatibility function of the query with the corresponding key.
+
+在传统NMT结构里，双向RNN编码器输出一个序列的向量 $\{h_1,h_2,...,h_t\}$，解码器每次解码的时候，query是解码器上一时刻的隐状态，一个序列的key-value是 $\{(h_1,h_1),(h_2,h_2),...,(h_t,h_t)\}$ ，即key和value相同。query跟每个key做一个点乘得到分数，将分数用$softmax$归一化得到权重，将权重跟value做加权和得到当前时刻的context。context作为解码器的RNN的当前时刻的输入进行更新。
+
+### 模型组成
+把整个模型当做一个函数，该函数由若干个子函数的复合函数组成。解读流程就是从一开始的子函数说起，直到最后一个子函数的输出。
+
+模型输入：将每个词转成unique整数之后的原句，已经解码了的词序列（将每个词转成unique整数）。
+模型输出：对译句所有词的概率分布。
+#### 子函数1：词向量矩阵和Positional Encoding
+输入：同模型输入 
+<br>
+输出：输入的每个词转成一个$d_{model}$维的向量，贯穿全篇 $p_{model} = 512$
+
+这个子函数分两步，第一步将每个词通过词向量矩阵转成一个$d_{model}$维的向量。这是普通词向量的常规做法。
+
+第二步，为每一个词做一个位置嵌入，这样之后的attention层（子函数）就可以感知每个词的位置。公式是：
+
+$$
+PE(pos,2i) = sin(pos/10000^{2i/d_{model}}) \\
+PE(pos,2i+1) = cos(pos/10000^{2i/d_{model}})
+$$
+
+其中， $pos$表示词的相对位置。比如原句有五个词，那么这五个词的位置嵌入就是 $\{PE(0),PE(1),PE(2),PE(3),PE(4)\}$。$PE(pos,i)$表示$PE(pos)$的第$i$维。让$i=0-255$就可以得到$PE(pos)$每个维度的数值，进而得到$PE(pos)$。至于为什么用余弦函数得到的位置嵌入可以让attention感知每个词的位置，很尴尬我也不是很懂。
+
+将每个词的词嵌入和位置嵌入做一个向量加法，就得到了最终输出。
+
+#### 子函数2：一系列Scaled Dot-Product Attention
+子函数1的输出是两个矩阵，行数为词个数，列数为$d_{model}$。前一个矩阵是原句得到的，后一个是译句得到的。两个参数不同的子函数2分别作用于两个矩阵，这里只说encoder部分的子函数2。
+
+输入：$num\_words \times d_{model}$ 的矩阵
+<br>
+输出：$num\_words \times d_{v}$ 的矩阵
+
+Scaled Dot-Product Attention中scaled的含义是对常规注意力得到的向量乘以一个缩放系数(scaling factor)。它的query是词的向量做一个 $W^Q \in \mathbb{R}^{d_{model} \times d_k}$的线性变换，即将一个$d_{model}$维的行向量线性变换到一个$d_k$维的行向量，论文中$d_k = 64$。它的keys是为每个词的向量做一个$W^K \in \mathbb{R}^{d_{model} \times d_k}$ 的线性变换得到一个$d_k$维的向量，即keys是一个序列的向量，一个$num\_words \times d_k$的矩阵。它的values是为每个词的向量做一个$W^V \in \mathbb{R}^{d_{model} \times d_v}$ 的线性变换得到一个$d_v$维的向量，即values是一个序列的向量，一个$num\_words \times d_v$的矩阵，这里$d_v = d_k$。
+我们要为每一个词做一个Scaled Dot-Product Attention得到这个词的attention向量，计算每个词的时候以这个词的向量的线性变换作为query，所有词的向量的线性变换作为keys和values，query和每个key做一个点积得到相应key的权重，将所有values做加权和得到当前词的attentio向量。因为是句子内部进行注意力权重分配，不像传统NMT结构那样需要外部query(decoder的隐状态)，所以叫self attention。
+
+这个一系列对每个词做一个attention的子函数2可以用矩阵乘法一次性解决，不需要像RNN encoder那样每次处理一个时间点，这就是parallelization的含义，将时间复杂度从$O(n)$缩小到$O(1)$。上段已经隐约表明$Q = K = V$，是子函数1得到的原句的矩阵。子函数2的输出就是：
+
+$$
+Attention(QW^Q,KW^K,QW^V) = softmax(\frac{(QW^Q)(KW^K)^T}{\sqrt{d_k}})(QW^V)
+$$
+
+这就是论文中的式$(1)$，区别是式$(1)$中的$Q$在这里是$QW^Q$。$(QW^Q)(KW^K)$(记为$weights$)是$num\_words \times num\_words$的矩阵，它的第$i$行表示计算第$i$个词的attention向量的时候每个词的向量的分数，然后对$weights$中的每一个数乘以缩放系数，再对每一行做一个$softmax$归一化，即$softmax$的对象是一个矩阵而不是向量，它对矩阵的每一行做归一化。$Attention(QW^Q,KW^K,QW^V)$的最终结果是一个$num\_words \times d_v$的矩阵，它的第$i$行表示第$i$个词的attention向量，在传统NMT语境下是context向量的意思。
+
+
+
+
+Multi-Head Attention对每一个词的向量做一系列操作得到一个$d_{model}$的向量，
+
+每一个head是由Scaled Dot-Product Attention得到的。
+
+#### 子函数2：Multi-Head Attention
+
+#### Residual Connection + Layer Normalization
 
 
 
