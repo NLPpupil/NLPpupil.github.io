@@ -50,11 +50,11 @@ $$
 #### 子函数2：一系列Scaled Dot-Product Attention
 子函数1的输出是两个矩阵，行数为词个数，列数为$d_{model}$。前一个矩阵是原句得到的，后一个是译句得到的。两个参数不同的子函数2分别作用于两个矩阵，这里只说encoder部分的子函数2。
 
-输入：$num\_ words \times d_{model}$ 的矩阵
+输入：$length \times d_{model}$ 的矩阵
 <br>
-输出：$num\_ words \times d_{v}$ 的矩阵
+输出：$length \times d_{v}$ 的矩阵
 
-Scaled Dot-Product Attention中scaled的含义是对常规注意力得到的向量乘以一个缩放系数(scaling factor)。它的query是词的向量做一个 $W^Q \in \mathbb{R}^{d_{model} \times d_k}$的线性变换，即将一个$d_{model}$维的行向量线性变换到一个$d_k$维的行向量，论文中$d_k = 64$。它的keys是为每个词的向量做一个$W^K \in \mathbb{R}^{d_{model} \times d_k}$ 的线性变换得到一个$d_k$维的向量，即keys是一个序列的向量，一个$num\_words \times d_k$的矩阵。它的values是为每个词的向量做一个$W^V \in \mathbb{R}^{d_{model} \times d_v}$ 的线性变换得到一个$d_v$维的向量，即values是一个序列的向量，一个$num\_words \times d_v$的矩阵，这里$d_v = d_k$。
+Scaled Dot-Product Attention中scaled的含义是对常规注意力得到的向量乘以一个缩放系数(scaling factor)。它的query是词的向量做一个 $W^Q \in \mathbb{R}^{d_{model} \times d_k}$的线性变换，即将一个$d_{model}$维的行向量线性变换到一个$d_k$维的行向量，论文中$d_k = 64$。它的keys是为每个词的向量做一个$W^K \in \mathbb{R}^{d_{model} \times d_k}$ 的线性变换得到一个$d_k$维的向量，即keys是一个序列的向量，一个$length \times d_k$的矩阵。它的values是为每个词的向量做一个$W^V \in \mathbb{R}^{d_{model} \times d_v}$ 的线性变换得到一个$d_v$维的向量，即values是一个序列的向量，一个$length \times d_v$的矩阵，这里$d_v = d_k$。
 我们要为每一个词做一个Scaled Dot-Product Attention得到这个词的attention向量，计算每个词的时候以这个词的向量的线性变换作为query，所有词的向量的线性变换作为keys和values，query和每个key做一个点积得到相应key的权重，将所有values做加权和得到当前词的attentio向量。因为是句子内部进行注意力权重分配，不像传统NMT结构那样需要外部query(decoder的隐状态)，所以叫self attention。
 
 这个一系列对每个词做一个attention的子函数2可以用矩阵乘法一次性解决，不需要像RNN encoder那样每次处理一个时间点，这就是parallelization的含义，将时间复杂度从$O(n)$缩小到$O(1)$。上段已经隐约表明$Q = K = V$，是子函数1得到的原句的矩阵。子函数2的输出就是：
@@ -63,7 +63,7 @@ $$
 Attention(QW^Q,KW^K,QW^V) = softmax(\frac{(QW^Q)(KW^K)^T}{\sqrt{d_k}})(QW^V)
 $$
 
-这就是论文中的式$(1)$，区别是式$(1)$中的$Q$在这里是$QW^Q$。$(QW^Q)(KW^K)$(记为$weights$)是$num\_words \times num\_words$的矩阵，它的第$i$行表示计算第$i$个词的attention向量的时候每个词的向量的分数，然后对$weights$中的每一个数乘以缩放系数，再对每一行做一个$softmax$归一化，即$softmax$的对象是一个矩阵而不是向量，它对矩阵的每一行做归一化。$Attention(QW^Q,KW^K,QW^V)$的最终结果是一个$num\_words \times d_v$的矩阵，它的第$i$行表示第$i$个词的attention向量，在传统NMT语境下是context向量的意思。
+这就是论文中的式$(1)$，区别是式$(1)$中的$Q$在这里是$QW^Q$。$(QW^Q)(KW^K)$(记为$weights$)是$length \times length$的矩阵，它的第$i$行表示计算第$i$个词的attention向量的时候每个词的向量的分数，然后对$weights$中的每一个数乘以缩放系数，再对每一行做一个$softmax$归一化，即$softmax$的对象是一个矩阵而不是向量，它对矩阵的每一行做归一化。$Attention(QW^Q,KW^K,QW^V)$的最终结果是一个$length \times d_v$的矩阵，它的第$i$行表示第$i$个词的attention向量，在传统NMT语境下是context向量的意思。
 
 
 
@@ -74,12 +74,12 @@ Multi-Head Attention重点在Multi-Head上，多头的意思是假设每个词�
 
 也就是子函数2是子函数3的一部分，子函数3同时做$h$个子函数2，这样每个词就有$h$个attention向量，再将每个词的$h$个向量连接起来，做一个$W^O \in \mathbb{R}^{d_{model} \times d_{model}}$的线性映射，就是每个词经过多头注意力后的结果。
 
-因此，子函数3的输出仍是一个$num\_words \times d_{model}$的矩阵。
+因此，$8$个$64$维的向量连接起来，所以子函数3的输出仍是一个$length \times d_{model}$的矩阵。
 
 
 #### 子函数4： Residual Connection + Layer Normalization
-encoder有6个相同的层，每个层又有两个子层。子函数2，3是第一个子层，记为sublayer1。sublayer1的输入是子函数1的输出，记为x，是一个$num\_words \times d_{model}$的矩阵。sublayer1的输出是子函数3的输出，也是$num\_words \times d_{model}$的矩阵。子函数4的输出是：
-LayerNorm(x + sublayer1(x))，也是一个$num\_words \times d_{model}$的矩阵。
+encoder有6个相同的层，每个层又有两个子层。子函数2，3是第一个子层，记为sublayer1。sublayer1的输入是子函数1的输出，记为x，是一个$length \times d_{model}$的矩阵。sublayer1的输出是子函数3的输出，也是$length \times d_{model}$的矩阵。子函数4的输出是：
+LayerNorm(x + sublayer1(x))，也是一个$length \times d_{model}$的矩阵。
 
 #### 子函数5：Position-wise Feed-Forward Networks
 一个position对应一个词，一个词对应矩阵的一行，子函数5对矩阵的每一行做两个线性映射，中间加一个ReLU。
@@ -94,10 +94,10 @@ $$
 FFN(X)= max(0,xW_1 + b_1)W_2 + b_2
 $$
 
-这是encoder每层的第二个子层，再做一个子函数4。子层1和2加在一起构成了encoder的一个层，六个这样的层构成了encoder。
+这是encoder每层的第二个子层，再做一个子函数4。子层1和2加在一起构成了encoder的一个层，六个这样的层构成了encoder。encoder的最终输出还是一个$length \times d_{model}$的矩阵。
 
 ### Decoder部分
-decode的第一个多头注意力跟encoder的多头注意力一样操作，第二个多头注意力的区别是$Q$变成第一个的多头注意力输出。第二个注意力的作用跟传统NMT的attention作用一样，比较decoder当前向量跟原句哪个词相近，就更注意那个词。decoder的$FFN$跟encoder一样的操作。
+decoder的第一个多头注意力跟encoder的多头注意力一样操作，第二个多头注意力的区别是$Q$变成第一个的多头注意力输出。第二个注意力的作用跟传统NMT的attention作用一样，比较decoder当前向量跟原句哪个词相近，就更注意那个词。decoder的$FFN$跟encoder一样的操作。
 
 最后对decoder输出的矩阵的最后一行做一个线性变换和softmax，映射到词表的概率分布，就是模型最终的输出。
 
