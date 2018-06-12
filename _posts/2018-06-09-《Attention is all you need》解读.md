@@ -60,10 +60,10 @@ Scaled Dot-Product Attention中scaled的含义是对常规注意力得到的向�
 这个一系列对每个词做一个attention的子函数2可以用矩阵乘法一次性解决，不需要像RNN encoder那样每次处理一个时间点，这就是parallelization的含义，将时间复杂度从$O(n)$缩小到$O(1)$。上段已经隐约表明$Q = K = V$，是子函数1得到的原句的矩阵。子函数2的输出就是：
 
 $$
-Attention(QW^Q,KW^K,QW^V) = softmax(\frac{(QW^Q)(KW^K)^T}{\sqrt{d_k}})(QW^V)
+Attention(QW^Q,KW^K,VW^V) = softmax(\frac{(QW^Q)(KW^K)^T}{\sqrt{d_k}})(VW^V)
 $$
 
-这就是论文中的式$(1)$，区别是式$(1)$中的$Q$在这里是$QW^Q$。$(QW^Q)(KW^K)$(记为$weights$)是$length \times length$的矩阵，它的第$i$行表示计算第$i$个词的attention向量的时候每个词的向量的分数，然后对$weights$中的每一个数乘以缩放系数，再对每一行做一个$softmax$归一化，即$softmax$的对象是一个矩阵而不是向量，它对矩阵的每一行做归一化。$Attention(QW^Q,KW^K,QW^V)$的最终结果是一个$length \times d_v$的矩阵，它的第$i$行表示第$i$个词的attention向量，在传统NMT语境下是context向量的意思。
+这就是论文中的式$(1)$，区别是式$(1)$中的$Q$在这里是$QW^Q$。$(QW^Q)(KW^K)$(记为$weights$)是$length \times length$的矩阵，它的第$i$行表示计算第$i$个词的attention向量的时候每个词的向量的分数，然后对$weights$中的每一个数乘以缩放系数，再对每一行做一个$softmax$归一化，即$softmax$的对象是一个矩阵而不是向量，它对矩阵的每一行做归一化。$Attention(QW^Q,KW^K,VW^V)$的最终结果是一个$length \times d_v$的矩阵，它的第$i$行表示第$i$个词的attention向量，在传统NMT语境下是context向量的意思。
 
 
 
@@ -97,7 +97,7 @@ $$
 这是encoder每层的第二个子层，再做一个子函数4。子层1和2加在一起构成了encoder的一个层，六个这样的层构成了encoder。encoder的最终输出还是一个$length \times d_{model}$的矩阵。
 
 #### Decoder部分
-decoder的第一个多头注意力跟encoder的多头注意力一样操作，第二个多头注意力的区别是$Q$变成第一个的多头注意力输出。第二个注意力的作用跟传统NMT的attention作用一样，比较decoder当前向量跟原句哪个词相近，就更注意那个词。decoder的$FFN$跟encoder一样的操作。
+decoder的第一个多头注意力跟encoder的多头注意力一样操作，第二个多头注意力的区别是$Q$变成第一个的多头注意力输出，K=V是encoder的输出。第二个注意力的作用跟传统NMT的attention作用一样，比较decoder当前向量跟原句哪个词相近，就更注意那个词。decoder的$FFN$跟encoder一样的操作。
 
 最后对decoder输出的矩阵的最后一行做一个线性变换和softmax，映射到词表的概率分布，就是模型最终的输出。
 
