@@ -5,7 +5,7 @@ date:   2018-06-09
 categories: 自然语言处理 深度学习
 ---
 
-## 基础要求
+#### 基础要求
 
 - 传统NMT encoder-decoder + attention结构。
 - 概率基础。
@@ -15,21 +15,21 @@ categories: 自然语言处理 深度学习
 
 
 
-## Attention 定义
+#### Attention 定义
 你所需要的只是注意力，那么注意力是什么呢？原文有一段精辟的定义，要深刻理解：
 >An attention function can be described as mapping a query and a set of key-value pairs to an output, where the query, keys, values, and output are all vectors. The output is computed as a weighted sum of the values, where the weight assigned to each value is computed by a compatibility function of the query with the corresponding key.
 
 在传统NMT结构里，双向RNN编码器输出一个序列的向量 $\{h_1,h_2,...,h_t\}$，解码器每次解码的时候，query是解码器上一时刻的隐状态，一个序列的key-value是 $\{(h_1,h_1),(h_2,h_2),...,(h_t,h_t)\}$ ，即key和value相同。query跟每个key做一个点乘得到分数，将分数用$softmax$归一化得到权重，将权重跟value做加权和得到当前时刻的context。context作为解码器的RNN的当前时刻的输入进行更新。
 
-## 模型组成
+#### 模型组成
 把整个模型当做一个函数，该函数由若干个子函数的复合函数组成。解读流程就是从一开始的子函数说起，直到最后一个子函数的输出。
 
 
 模型输入：将每个词转成unique整数之后的原句，已经解码了的词序列（将每个词转成unique整数）。
 模型输出：对译句所有词的概率分布。
 
-### Encoder部分
-#### 子函数1：词向量矩阵和Positional Encoding
+#### Encoder部分
+##### 子函数1：词向量矩阵和Positional Encoding
 输入：同模型输入 
 <br>
 输出：输入的每个词转成一个$d_{model}$维的向量，贯穿全篇 $p_{model} = 512$
@@ -96,7 +96,7 @@ $$
 
 这是encoder每层的第二个子层，再做一个子函数4。子层1和2加在一起构成了encoder的一个层，六个这样的层构成了encoder。encoder的最终输出还是一个$length \times d_{model}$的矩阵。
 
-### Decoder部分
+#### Decoder部分
 decoder的第一个多头注意力跟encoder的多头注意力一样操作，第二个多头注意力的区别是$Q$变成第一个的多头注意力输出。第二个注意力的作用跟传统NMT的attention作用一样，比较decoder当前向量跟原句哪个词相近，就更注意那个词。decoder的$FFN$跟encoder一样的操作。
 
 最后对decoder输出的矩阵的最后一行做一个线性变换和softmax，映射到词表的概率分布，就是模型最终的输出。
