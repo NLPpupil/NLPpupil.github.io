@@ -50,9 +50,9 @@ $$
 #### 子函数2：一系列Scaled Dot-Product Attention
 子函数1的输出是两个矩阵，行数为词个数，列数为$d_{model}$。前一个矩阵是原句得到的，后一个是译句得到的。两个参数不同的子函数2分别作用于两个矩阵，这里只说encoder部分的子函数2。
 
-输入：$num\_words \times d_{model}$ 的矩阵
+输入：$num\_ words \times d_{model}$ 的矩阵
 <br>
-输出：$num\_words \times d_{v}$ 的矩阵
+输出：$num\_ words \times d_{v}$ 的矩阵
 
 Scaled Dot-Product Attention中scaled的含义是对常规注意力得到的向量乘以一个缩放系数(scaling factor)。它的query是词的向量做一个 $W^Q \in \mathbb{R}^{d_{model} \times d_k}$的线性变换，即将一个$d_{model}$维的行向量线性变换到一个$d_k$维的行向量，论文中$d_k = 64$。它的keys是为每个词的向量做一个$W^K \in \mathbb{R}^{d_{model} \times d_k}$ 的线性变换得到一个$d_k$维的向量，即keys是一个序列的向量，一个$num\_words \times d_k$的矩阵。它的values是为每个词的向量做一个$W^V \in \mathbb{R}^{d_{model} \times d_v}$ 的线性变换得到一个$d_v$维的向量，即values是一个序列的向量，一个$num\_words \times d_v$的矩阵，这里$d_v = d_k$。
 我们要为每一个词做一个Scaled Dot-Product Attention得到这个词的attention向量，计算每个词的时候以这个词的向量的线性变换作为query，所有词的向量的线性变换作为keys和values，query和每个key做一个点积得到相应key的权重，将所有values做加权和得到当前词的attentio向量。因为是句子内部进行注意力权重分配，不像传统NMT结构那样需要外部query(decoder的隐状态)，所以叫self attention。
